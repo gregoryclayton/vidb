@@ -546,12 +546,12 @@ function extractFeatures(canvas) {
   let edges = 0;
   for (let y = 1; y < H - 1; y++) {
     for (let x = 1; x < W - 1; x++) {
-      const gx2 = -lum[(y-1)*W+(x-1)] + lum[(y-1)*W+(x+1)]
-                  - 2*lum[y*W+(x-1)]   + 2*lum[y*W+(x+1)]
-                  - lum[(y+1)*W+(x-1)] + lum[(y+1)*W+(x+1)];
-      const gy2 = -lum[(y-1)*W+(x-1)] - 2*lum[(y-1)*W+x] - lum[(y-1)*W+(x+1)]
-                  + lum[(y+1)*W+(x-1)] + 2*lum[(y+1)*W+x] + lum[(y+1)*W+(x+1)];
-      if (Math.sqrt(gx2 * gx2 + gy2 * gy2) > 0.12) edges++;
+      const gradX = -lum[(y-1)*W+(x-1)] + lum[(y-1)*W+(x+1)]
+                    - 2*lum[y*W+(x-1)]   + 2*lum[y*W+(x+1)]
+                    - lum[(y+1)*W+(x-1)] + lum[(y+1)*W+(x+1)];
+      const gradY = -lum[(y-1)*W+(x-1)] - 2*lum[(y-1)*W+x] - lum[(y-1)*W+(x+1)]
+                    + lum[(y+1)*W+(x-1)] + 2*lum[(y+1)*W+x] + lum[(y+1)*W+(x+1)];
+      if (Math.sqrt(gradX * gradX + gradY * gradY) > 0.12) edges++;
     }
   }
   feat.push(meanL, stdL, sumSat / totalPx, edges / totalPx);
@@ -687,6 +687,18 @@ function drawForest(ctx, S) {
   ctx.fillStyle = '#1b4332';
   for (let i = 0; i < 7; i++) { const x = i*36+10, h = 80+i*15; ctx.beginPath(); ctx.moveTo(x, S*.9); ctx.lineTo(x+18, S*.9-h); ctx.lineTo(x+36, S*.9); ctx.fill(); }
 }
+// Seeded PRNG (mulberry32) for reproducible demo images
+function seededRand(seed) {
+  let s = seed >>> 0;
+  return function() {
+    s += 0x6d2b79f5;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 0xffffffff;
+  };
+}
+
 function drawGeometric(ctx, S) {
   const cols = ['#ef233c','#2b2d42','#8d99ae','#edf2f4','#f72585','#7209b7','#3a0ca3','#4361ee'];
   for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
@@ -696,12 +708,14 @@ function drawGeometric(ctx, S) {
 }
 function drawPastel(ctx, S) {
   const c = ['#ffb3c1','#ffc8dd','#ffd6ff','#c8b6ff','#bde0fe','#caffbf'];
-  for (let i = 0; i < 12; i++) { ctx.fillStyle = c[i%c.length]; ctx.beginPath(); ctx.arc(Math.random()*S, Math.random()*S, 20+Math.random()*50, 0, Math.PI*2); ctx.fill(); }
+  const rand = seededRand(42);
+  for (let i = 0; i < 12; i++) { ctx.fillStyle = c[i%c.length]; ctx.beginPath(); ctx.arc(rand()*S, rand()*S, 20+rand()*50, 0, Math.PI*2); ctx.fill(); }
 }
 function drawNight(ctx, S) {
   rg(ctx, 0, 0, 0, S, '#03045e', '#023e8a', '#0077b6', '#00043a');
   ctx.fillStyle = 'rgba(255,255,255,.9)';
-  for (let i = 0; i < 60; i++) { ctx.beginPath(); ctx.arc(Math.random()*S, Math.random()*S*.55, Math.random()*1.5+.5, 0, Math.PI*2); ctx.fill(); }
+  const rand = seededRand(7);
+  for (let i = 0; i < 60; i++) { ctx.beginPath(); ctx.arc(rand()*S, rand()*S*.55, rand()*1.5+.5, 0, Math.PI*2); ctx.fill(); }
   ctx.fillStyle = '#ffd60a'; ctx.beginPath(); ctx.arc(S*.75, S*.22, 28, 0, Math.PI*2); ctx.fill();
 }
 function drawWarm(ctx, S) {
@@ -732,7 +746,7 @@ function renderGallery() {
         <div class="gmeta">${item.width}×${item.height}${item.modified ? ' · <span style="color:#3fb950">re-embedded</span>' : ''}</div>
         ${simScore}
       </div>
-      <button class="del-btn" title="Remove" onclick="removeImage(event,${item.id})">✕</button>`;
+      <button class="del-btn" title="Remove" onclick="removeImage(event,${parseInt(item.id, 10)})">✕</button>`;
     list.appendChild(div);
   });
 }
@@ -903,7 +917,7 @@ function renderSimilarPanel(results) {
   const panel = document.getElementById('simPanel');
   if (!results.length) { panel.innerHTML = '<div class="empty-state">No other images to compare</div>'; return; }
   panel.innerHTML = results.map(it => `
-    <div class="sim-item" onclick="selectImage(${it.id})">
+    <div class="sim-item" onclick="selectImage(${parseInt(it.id, 10)})">
       <img src="${it.src}" alt="">
       <div class="sinfo">
         <div class="sname">${it.name}</div>
